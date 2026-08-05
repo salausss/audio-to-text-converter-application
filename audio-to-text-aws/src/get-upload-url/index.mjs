@@ -1,0 +1,39 @@
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { randomUUID } from "crypto";
+
+const s3 = new S3Client({});
+const BUCKET = process.env.BUCKET_NAME;
+
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "content-type",
+  "Access-Control-Allow-Methods": "GET,OPTIONS",
+};
+
+export const handler = async (event) => {
+  // Handle CORS preflight
+  if (event.requestContext?.http?.method === "OPTIONS") {
+    return { statusCode: 200, headers: CORS_HEADERS, body: "" };
+  }
+
+  const contentType =
+    event.queryStringParameters?.contentType || "audio/mpeg";
+  const key = `uploads/${randomUUID()}`;
+
+  const command = new PutObjectCommand({
+    Bucket: BUCKET,
+    Key: key,
+    ContentType: contentType,
+  });
+
+  // Browser will PUT the audio file directly to S3 using this URL —
+  // the file never passes through Lambda, so no payload-size limits apply.
+  const uploadUrl = await getSignedUrl(s3, command, { expiresIn: 300 });
+
+  return {
+    statusCode: 200,
+    headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+    body: JSON.stringify({ uploadUrl, key }),
+  };
+};

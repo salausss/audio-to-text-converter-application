@@ -1,0 +1,99 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Free audio-to-text app - pay-per-use serverless stack.
+  S3 (temp storage, auto-delete) + 2 Lambda functions exposed via Function URLs
+  (no API Gateway, so no per-request charge on top of Lambda) + Groq Whisper API.
+
+Parameters:
+  GroqApiKey:
+    Type: String
+    NoEcho: true
+    Description: API key for Groq's Whisper transcription endpoint (console.groq.com)
+
+Globals:
+  Function:
+    Runtime: nodejs20.x
+    MemorySize: 512
+    Timeout: 60
+    Architectures:
+      - arm64   # cheaper than x86_64, same free-tier allowance
+
+Resources:
+  # ---------- Storage ----------
+  AudioBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub audio-to-text-${AWS::AccountId}
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders: ["*"]
+            AllowedMethods: [PUT, GET]
+            AllowedOrigins: ["*"]
+            MaxAge: 3000
+      LifecycleConfiguration:
+        Rules:
+          - Id: AutoDeleteTempAudio
+            Status: Enabled
+            ExpirationInDays: 1   # nothing lingers in storage, keeps cost ~0
+
+  # ---------- Function 1: issue a presigned S3 upload URL ----------
+  GetUploadUrlFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/get-upload-url/
+      Handler: index.handler
+      Environment:
+        Variables:
+          BUCKET_NAME: !Ref AudioBucket
+      Policies:
+        - S3CrudPolicy:
+            BucketName: !Ref AudioBucket
+      FunctionUrlConfig:
+        AuthType: NONE
+        Cors:
+          AllowOrigins: ["*"]
+          AllowMethods: ["GET"]
+          AllowHeaders: ["content-type"]
+
+  GetUploadUrlLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${GetUploadUrlFunction}
+      RetentionInDays: 7   # stops CloudWatch log storage from accumulating cost
+
+  # ---------- Function 2: download from S3, call Groq, return transcript ----------
+  TranscribeFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/transcribe/
+      Handler: index.handler
+      Environment:
+        Variables:
+          BUCKET_NAME: !Ref AudioBucket
+          GROQ_API_KEY: !Ref GroqApiKey
+      Policies:
+        - S3CrudPolicy:
+            BucketName: !Ref AudioBucket
+      FunctionUrlConfig:
+        AuthType: NONE
+        Cors:
+          AllowOrigins: ["*"]
+          AllowMethods: ["POST"]
+          AllowHeaders: ["content-type"]
+
+  TranscribeLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${TranscribeFunction}
+      RetentionInDays: 7
+
+Outputs:
+  GetUploadUrlEndpoint:
+    Description: Paste into frontend as GET_UPLOAD_URL_ENDPOINT
+    Value: !GetAtt GetUploadUrlFunctionUrl.FunctionUrl
+  TranscribeEndpoint:
+    Description: Paste into frontend as TRANSCRIBE_ENDPOINT
+    Value: !GetAtt TranscribeFunctionUrl.FunctionUrl
+  BucketName:
+    Value: !Ref AudioBucket
