@@ -75,13 +75,19 @@
         });
         const data = await transcribeRes.json();
 
-        if (data.text) {
-          status.textContent = "Done.";
-          result.textContent = data.text;
-          result.style.display = "block";
+        if (data.segments && data.segments.length) {
+        status.textContent = "Done.";
+        result.innerHTML = "";
+        data.segments.forEach((seg) => {
+          const line = document.createElement("div");
+          line.style.marginBottom = "10px";
+          line.innerHTML = `<span style="color:#888">${seg.time}</span> <strong>Speaker ${seg.speaker}:</strong> ${seg.text}`;
+          result.appendChild(line);
+        });
+        result.style.display = "block";
         } else {
-          status.textContent = "Something went wrong: " + (data.error || "unknown error");
-        }
+        status.textContent = "Something went wrong: " + (data.error || "unknown error");
+      }
       } catch (err) {
         status.textContent = "Error: " + err.message;
       }

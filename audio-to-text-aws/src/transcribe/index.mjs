@@ -5,6 +5,13 @@ const s3 = new S3Client({});
 const BUCKET = process.env.BUCKET_NAME;
 const ASSEMBLYAI_API_KEY = process.env.ASSEMBLYAI_API_KEY;
 
+function formatTimestamp(ms) {
+  const totalSeconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
 export const handler = async (event) => {
   if (event.requestContext?.http?.method === "OPTIONS") {
     return { statusCode: 200, body: "" };
@@ -57,10 +64,13 @@ export const handler = async (event) => {
       throw new Error(result.error || "Transcription timed out");
     }
 
-    const lines = (result.utterances || []).map(
-      (u) => `Speaker ${u.speaker}: ${u.text}`
-    );
-    const transcript = lines.length ? lines.join("\n") : result.text;
+    // Return structured segments instead of one flat string, so the
+    // frontend can render each turn as its own line with a timestamp
+    const segments = (result.utterances || []).map((u) => ({
+      speaker: u.speaker,
+      time: formatTimestamp(u.start),
+      text: u.text,
+    }));
 
     await s3
       .send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }))
@@ -69,7 +79,7 @@ export const handler = async (event) => {
     return {
       statusCode: 200,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: transcript }),
+      body: JSON.stringify({ segments }),
     };
   } catch (err) {
     console.error(err);
