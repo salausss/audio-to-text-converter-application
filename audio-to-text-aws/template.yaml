@@ -6,7 +6,7 @@ Description: >
   (no API Gateway, so no per-request charge on top of Lambda) + Groq Whisper API.
 
 Parameters:
-  GroqApiKey:
+  AssemblyAiApiKey:
     Type: String
     NoEcho: true
     Description: API key for Groq's Whisper transcription endpoint (console.groq.com)
@@ -15,7 +15,7 @@ Globals:
   Function:
     Runtime: nodejs20.x
     MemorySize: 512
-    Timeout: 60
+    Timeout: 300
     Architectures:
       - arm64   # cheaper than x86_64, same free-tier allowance
 
@@ -71,7 +71,7 @@ Resources:
       Environment:
         Variables:
           BUCKET_NAME: !Ref AudioBucket
-          GROQ_API_KEY: !Ref GroqApiKey
+          ASSEMBLYAI_API_KEY: !Ref AssemblyAiApiKey
       Policies:
         - S3CrudPolicy:
             BucketName: !Ref AudioBucket

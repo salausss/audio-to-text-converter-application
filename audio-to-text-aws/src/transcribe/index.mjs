@@ -1,12 +1,9 @@
-import {
-  S3Client,
-  GetObjectCommand,
-  DeleteObjectCommand,
-} from "@aws-sdk/client-s3";
+import { S3Client, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 const s3 = new S3Client({});
 const BUCKET = process.env.BUCKET_NAME;
-const GROQ_API_KEY = process.env.GROQ_API_KEY;
+const ASSEMBLYAI_API_KEY = process.env.ASSEMBLYAI_API_KEY;
 
 export const handler = async (event) => {
   if (event.requestContext?.http?.method === "OPTIONS") {
@@ -23,30 +20,47 @@ export const handler = async (event) => {
       };
     }
 
-    const obj = await s3.send(
-      new GetObjectCommand({ Bucket: BUCKET, Key: key })
-    );
-    const audioBuffer = Buffer.from(await obj.Body.transformToByteArray());
-
-    const form = new FormData();
-    form.append("file", new Blob([audioBuffer]), "audio.mp3");
-    form.append("model", "whisper-large-v3-turbo");
-
-    const res = await fetch(
-      "https://api.groq.com/openai/v1/audio/transcriptions",
-      {
-        method: "POST",
-        headers: { Authorization: `Bearer ${GROQ_API_KEY}` },
-        body: form,
-      }
+    const audioUrl = await getSignedUrl(
+      s3,
+      new GetObjectCommand({ Bucket: BUCKET, Key: key }),
+      { expiresIn: 600 }
     );
 
-    if (!res.ok) {
-      const errText = await res.text();
-      throw new Error(`Groq API error: ${res.status} ${errText}`);
+    const submitRes = await fetch("https://api.assemblyai.com/v2/transcript", {
+      method: "POST",
+      headers: {
+        Authorization: ASSEMBLYAI_API_KEY,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        audio_url: audioUrl,
+        speaker_labels: true,
+      }),
+    });
+    const submitData = await submitRes.json();
+    if (!submitRes.ok) throw new Error(JSON.stringify(submitData));
+
+    const transcriptId = submitData.id;
+
+    let result;
+    for (let i = 0; i < 60; i++) {
+      await new Promise((r) => setTimeout(r, 3000));
+      const pollRes = await fetch(
+        `https://api.assemblyai.com/v2/transcript/${transcriptId}`,
+        { headers: { Authorization: ASSEMBLYAI_API_KEY } }
+      );
+      result = await pollRes.json();
+      if (result.status === "completed" || result.status === "error") break;
     }
 
-    const data = await res.json();
+    if (result.status !== "completed") {
+      throw new Error(result.error || "Transcription timed out");
+    }
+
+    const lines = (result.utterances || []).map(
+      (u) => `Speaker ${u.speaker}: ${u.text}`
+    );
+    const transcript = lines.length ? lines.join("\n") : result.text;
 
     await s3
       .send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }))
@@ -55,7 +69,7 @@ export const handler = async (event) => {
     return {
       statusCode: 200,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: data.text }),
+      body: JSON.stringify({ text: transcript }),
     };
   } catch (err) {
     console.error(err);
