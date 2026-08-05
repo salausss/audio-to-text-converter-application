@@ -10,7 +10,7 @@ const GROQ_API_KEY = process.env.GROQ_API_KEY;
 
 export const handler = async (event) => {
   if (event.requestContext?.http?.method === "OPTIONS") {
-    return { statusCode: 200, headers: CORS_HEADERS, body: "" };
+    return { statusCode: 200, body: "" };
   }
 
   try {
@@ -18,18 +18,16 @@ export const handler = async (event) => {
     if (!key) {
       return {
         statusCode: 400,
-        headers: CORS_HEADERS,
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ error: "Missing 'key'" }),
       };
     }
 
-    // Pull the uploaded audio file down from S3
     const obj = await s3.send(
       new GetObjectCommand({ Bucket: BUCKET, Key: key })
     );
     const audioBuffer = Buffer.from(await obj.Body.transformToByteArray());
 
-    // Build multipart form for Groq's OpenAI-compatible transcription endpoint
     const form = new FormData();
     form.append("file", new Blob([audioBuffer]), "audio.mp3");
     form.append("model", "whisper-large-v3-turbo");
@@ -50,22 +48,20 @@ export const handler = async (event) => {
 
     const data = await res.json();
 
-    // Delete the temp file immediately after transcribing — don't wait for
-    // the 1-day lifecycle rule, keeps storage cost at essentially zero.
     await s3
       .send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }))
       .catch(() => {});
 
     return {
       statusCode: 200,
-      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text: data.text }),
     };
   } catch (err) {
     console.error(err);
     return {
       statusCode: 500,
-      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ error: "Transcription failed" }),
     };
   }
