@@ -8,12 +8,6 @@ const s3 = new S3Client({});
 const BUCKET = process.env.BUCKET_NAME;
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "content-type",
-  "Access-Control-Allow-Methods": "POST,OPTIONS",
-};
-
 export const handler = async (event) => {
   if (event.requestContext?.http?.method === "OPTIONS") {
     return { statusCode: 200, headers: CORS_HEADERS, body: "" };

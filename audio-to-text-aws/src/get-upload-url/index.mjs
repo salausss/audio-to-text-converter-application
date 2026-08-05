@@ -5,12 +5,6 @@ import { randomUUID } from "crypto";
 const s3 = new S3Client({});
 const BUCKET = process.env.BUCKET_NAME;
 
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "content-type",
-  "Access-Control-Allow-Methods": "GET,OPTIONS",
-};
-
 export const handler = async (event) => {
   // Handle CORS preflight
   if (event.requestContext?.http?.method === "OPTIONS") {
