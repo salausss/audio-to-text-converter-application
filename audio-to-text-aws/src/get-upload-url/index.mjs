@@ -6,9 +6,8 @@ const s3 = new S3Client({});
 const BUCKET = process.env.BUCKET_NAME;
 
 export const handler = async (event) => {
-  // Handle CORS preflight
   if (event.requestContext?.http?.method === "OPTIONS") {
-    return { statusCode: 200, headers: CORS_HEADERS, body: "" };
+    return { statusCode: 200, body: "" };
   }
 
   const contentType =
@@ -21,13 +20,11 @@ export const handler = async (event) => {
     ContentType: contentType,
   });
 
-  // Browser will PUT the audio file directly to S3 using this URL —
-  // the file never passes through Lambda, so no payload-size limits apply.
   const uploadUrl = await getSignedUrl(s3, command, { expiresIn: 300 });
 
   return {
     statusCode: 200,
-    headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ uploadUrl, key }),
   };
 };
