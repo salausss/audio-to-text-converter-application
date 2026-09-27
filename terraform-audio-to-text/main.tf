@@ -2,7 +2,7 @@
 module "audio_storage" {
   source = "./modules/s3-storage"
 
-  bucket_name           = "${var.project_name}-${data.aws_caller_identity.current.account_id}-text_storage"
+  bucket_name           = "${var.project_name}-${data.aws_caller_identity.current.account_id}-text-storage"
   cors_allowed_origins  = ["*"]
   expiration_days       = var.audio_bucket_expiration_days
   tags                  = var.tags
