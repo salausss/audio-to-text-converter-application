@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Free Audio to Text</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 600px; margin: 60px auto; padding: 0 20px; color: #222; }
+  h1 { font-size: 1.5rem; }
+  #dropzone { border: 2px dashed #999; border-radius: 8px; padding: 40px; text-align: center; cursor: pointer; transition: 0.15s; }
+  #dropzone.drag { border-color: #333; background: #f5f5f5; }
+  #status { margin-top: 16px; color: #555; min-height: 1.2em; }
+  #result { margin-top: 20px; white-space: pre-wrap; background: #f9f9f9; padding: 16px; border-radius: 8px; display: none; line-height: 1.5; }
+  #downloadBtn { display: none; margin-top: 12px; padding: 8px 16px; cursor: pointer; }
+  .ad-slot { margin-top: 40px; padding: 16px; border: 1px dashed #ccc; text-align: center; color: #999; font-size: 0.85rem; }
+</style>
+</head>
+<body>
+  <h1>Free Audio to Text</h1>
+  <p>Drop an audio file below. Nothing is stored after transcription.</p>
+
+  <div id="dropzone">Click or drag an audio file here</div>
+  <input type="file" id="fileInput" accept="audio/*" style="display:none">
+  <div id="status"></div>
+  <div id="result"></div>
+  <button id="downloadBtn">Download transcript</button>
+
+  <!-- Ad slot placeholder: put your AdSense/Ezoic unit here later -->
+  <div class="ad-slot">Ad placement</div>
+
+  <script>
+    const GET_UPLOAD_URL_ENDPOINT = "${get_upload_url_endpoint}";
+    const TRANSCRIBE_ENDPOINT = "${transcribe_endpoint}";
+
+    const dropzone = document.getElementById("dropzone");
+    const fileInput = document.getElementById("fileInput");
+    const status = document.getElementById("status");
+    const result = document.getElementById("result");
+    const downloadBtn = document.getElementById("downloadBtn");
+
+    dropzone.onclick = () => fileInput.click();
+    dropzone.ondragover = (e) => { e.preventDefault(); dropzone.classList.add("drag"); };
+    dropzone.ondragleave = () => dropzone.classList.remove("drag");
+    dropzone.ondrop = (e) => {
+      e.preventDefault();
+      dropzone.classList.remove("drag");
+      if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+    };
+    fileInput.onchange = () => {
+      if (fileInput.files.length) handleFile(fileInput.files[0]);
+    };
+
+    async function handleFile(file) {
+      result.style.display = "none";
+      result.innerHTML = "";
+      downloadBtn.style.display = "none";
+
+      try {
+        status.textContent = "Requesting upload URL…";
+        const urlRes = await fetch(
+          `$${GET_UPLOAD_URL_ENDPOINT}?contentType=$${encodeURIComponent(file.type || "audio/mpeg")}`
+        );
+        if (!urlRes.ok) throw new Error("Could not get upload URL");
+        const { uploadUrl, key } = await urlRes.json();
+
+        status.textContent = "Uploading audio…";
+        const putRes = await fetch(uploadUrl, {
+          method: "PUT",
+          body: file,
+          headers: { "Content-Type": file.type || "audio/mpeg" },
+        });
+        if (!putRes.ok) throw new Error("Upload failed");
+
+        status.textContent = "Transcribing… this can take a moment for longer files";
+        const transcribeRes = await fetch(TRANSCRIBE_ENDPOINT, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ key }),
+        });
+        const data = await transcribeRes.json();
+
+        if (data.segments && data.segments.length) {
+          status.textContent = "Done.";
+          result.innerHTML = "";
+
+          const plainTextLines = [];
+          data.segments.forEach((seg) => {
+            const line = document.createElement("div");
+            line.style.marginBottom = "10px";
+            line.innerHTML = `<span style="color:#888">$${seg.time}</span> <strong>Speaker $${seg.speaker}:</strong> $${seg.text}`;
+            result.appendChild(line);
+            plainTextLines.push(`[$${seg.time}] Speaker $${seg.speaker}: $${seg.text}`);
+          });
+          result.style.display = "block";
+
+          downloadBtn.style.display = "inline-block";
+          downloadBtn.onclick = () => {
+            const blob = new Blob([plainTextLines.join("\n")], { type: "text/plain" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "transcript.txt";
+            a.click();
+            URL.revokeObjectURL(url);
+          };
+        } else {
+          status.textContent = "Something went wrong: " + (data.error || "unknown error");
+        }
+      } catch (err) {
+        status.textContent = "Error: " + err.message;
+      }
+    }
+  </script>
+</body>
+</html>

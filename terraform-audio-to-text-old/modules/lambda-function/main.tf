@@ -112,16 +112,3 @@ resource "aws_lambda_permission" "public_invoke" {
   principal              = "*"
   function_url_auth_type = "NONE"
 }
-
-# As of ~Oct 2025, AWS also requires an explicit lambda:InvokeFunction grant
-# to the public principal for Function URLs with authorization_type NONE.
-# Without this (even with the InvokeFunctionUrl grant above in place),
-# requests return 403 AccessDeniedException. This is separate from the
-# InvokeFunctionUrl action above and from the s3.amazonaws.com grants in
-# permissions.tf, which only cover invocation by the S3 service.
-resource "aws_lambda_permission" "public_invoke_function" {
-  statement_id  = "AllowPublicFunctionInvoke"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.this.function_name
-  principal     = "*"
-}
