@@ -29,8 +29,8 @@
   <div class="ad-slot">Ad placement</div>
 
   <script>
-    const GET_UPLOAD_URL_ENDPOINT = "https://z5kp4mgjciookdkho62fw2fxle0ndbqe.lambda-url.ap-south-1.on.aws/";
-    const TRANSCRIBE_ENDPOINT = "https://celpb5vbqtzholbuqw35ery7bm0dcrlg.lambda-url.ap-south-1.on.aws/";
+    const GET_UPLOAD_URL_ENDPOINT = "${get_upload_url_endpoint}";
+    const TRANSCRIBE_ENDPOINT = "${transcribe_endpoint}";
 
     const dropzone = document.getElementById("dropzone");
     const fileInput = document.getElementById("fileInput");
@@ -58,7 +58,7 @@
       try {
         status.textContent = "Requesting upload URL…";
         const urlRes = await fetch(
-          `${GET_UPLOAD_URL_ENDPOINT}?contentType=${encodeURIComponent(file.type || "audio/mpeg")}`
+          `$${GET_UPLOAD_URL_ENDPOINT}?contentType=$${encodeURIComponent(file.type || "audio/mpeg")}`
         );
         if (!urlRes.ok) throw new Error("Could not get upload URL");
         const { uploadUrl, key } = await urlRes.json();
@@ -87,9 +87,9 @@
           data.segments.forEach((seg) => {
             const line = document.createElement("div");
             line.style.marginBottom = "10px";
-            line.innerHTML = `<span style="color:#888">${seg.time}</span> <strong>Speaker ${seg.speaker}:</strong> ${seg.text}`;
+            line.innerHTML = `<span style="color:#888">$${seg.time}</span> <strong>Speaker $${seg.speaker}:</strong> $${seg.text}`;
             result.appendChild(line);
-            plainTextLines.push(`[${seg.time}] Speaker ${seg.speaker}: ${seg.text}`);
+            plainTextLines.push(`[$${seg.time}] Speaker $${seg.speaker}: $${seg.text}`);
           });
           result.style.display = "block";
 
