@@ -9,9 +9,10 @@
   h1 { font-size: 1.5rem; }
   #dropzone { border: 2px dashed #999; border-radius: 8px; padding: 40px; text-align: center; cursor: pointer; transition: 0.15s; }
   #dropzone.drag { border-color: #333; background: #f5f5f5; }
-  #status { margin-top: 16px; color: #555; min-height: 1.2em; }
-  #result { margin-top: 20px; white-space: pre-wrap; background: #f9f9f9; padding: 16px; border-radius: 8px; display: none; line-height: 1.5; }
-  #downloadBtn { display: none; margin-top: 12px; padding: 8px 16px; cursor: pointer; }
+  #statusRow { margin-top: 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 1.6em; }
+  #status { color: #555; }
+  #downloadBtn { display: none; padding: 8px 16px; cursor: pointer; flex-shrink: 0; }
+  #result { margin-top: 12px; white-space: pre-wrap; background: #f9f9f9; padding: 16px; border-radius: 8px; display: none; line-height: 1.5; }
   .ad-slot { margin-top: 40px; padding: 16px; border: 1px dashed #ccc; text-align: center; color: #999; font-size: 0.85rem; }
 </style>
 </head>
@@ -20,10 +21,14 @@
   <p>Drop an audio file below. Nothing is stored after transcription.</p>
 
   <div id="dropzone">Click or drag an audio file here</div>
+
+  <div id="statusRow">
+    <div id="status"></div>
+    <button id="downloadBtn">Download transcript</button>
+  </div>
+
   <input type="file" id="fileInput" accept="audio/*" style="display:none">
-  <div id="status"></div>
   <div id="result"></div>
-  <button id="downloadBtn">Download transcript</button>
 
   <!-- Ad slot placeholder: put your AdSense/Ezoic unit here later -->
   <div class="ad-slot">Ad placement</div>
